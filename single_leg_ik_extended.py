@@ -109,24 +109,12 @@ DEFAULT_KNEE = 0.0
 DEFAULT_ANKLE = np.deg2rad(90.0)
 
 # Fixed local target for all legs in their own hip-relative frame
-# Stride Line Calculation
-# Start Point (Max Extension, Straight Leg):
-# Hypotenuse = L1 + L2 + L3 = 205.0
-# Z = -170.0
-# X_max = sqrt(205^2 - 170^2)
-total_len = L1 + L2 + L3
-req_z = -170.0
-stride_start_x = np.sqrt(total_len**2 - req_z**2)
-stride_end_x = 60.0 # Retracted position
-
-# Visualization set to Max Extension (Start of Stride)
-TGT_LOCAL_X = stride_start_x
+# X > 0 is outward, Y = 0 is centered, Z < 0 is down
+TGT_LOCAL_X = 60.0
 TGT_LOCAL_Y = 0.0
-TGT_LOCAL_Z = req_z
+TGT_LOCAL_Z = -170.0
 
-# Align foot with the leg vector for straight line
-foot_angle = atan2(req_z, stride_start_x)
-
+foot_angle = np.deg2rad(-90.0)
 maxr = HIP_RADIUS + L1 + L2 + L3 + 50
 ax.set_xlim(-maxr, maxr)
 ax.set_ylim(-maxr, maxr)
@@ -143,13 +131,6 @@ first_leg_text = ""
 # For visualization of the target for Leg 0
 target.set_data([TGT_LOCAL_X + HIP_RADIUS], [0])
 target.set_3d_properties([TGT_LOCAL_Z])
-
-# Highlight Origin
-ax.scatter([0], [0], [0], color='k', s=200, label='Origin', marker='*')
-
-# Visualize Stride Line
-ax.plot([stride_start_x + HIP_RADIUS, stride_end_x + HIP_RADIUS], [0, 0], [req_z, req_z], color='blue', linestyle='--', linewidth=2, label='Stride Line')
-
 
 for idx, hip_pos in enumerate(HIP_POSITIONS):
     leg_angle = LEG_ANGLES[idx]
@@ -211,31 +192,41 @@ if first_leg_text:
 else:
     info.set_text(f"Target unreachable\nreachable legs = {reachable_count}")
 
+# Export angles
+if result is not None:
+    base_yaw, angle1, angle2, angle3, phi, psi, r = result
+    
+    # Angles in degrees
+    d_base = deg(base_yaw)
+    d_femur = deg(angle1)
+    d_tibia = deg(angle2)
+    
+    with open("output/one_leg_poses_extended.txt", "w") as f:
+        f.write(f"# Exported Joint Angles (Degrees)\n")
+        f.write(f"# Target Local: ({TGT_LOCAL_X}, {TGT_LOCAL_Y}, {TGT_LOCAL_Z})\n")
+        f.write(f"# Format: Leg_Index: [Base_Yaw, Angle1, Angle2, Angle3]\n")
+        # Just writing Leg 0
+        f.write(f"Leg 0: [{d_base:.2f}, {d_femur:.2f}, {d_tibia:.2f}, {deg(angle3):.2f}]\n")
+    print("Joint positions exported to one_leg_poses.txt")
+
 # Export coordinates
-with open("one_leg_coordinates.txt", "w") as f:
+with open("output/one_leg_coordinates_extended.txt", "w") as f:
     f.write(f"Leg   Joint               X          Y          Z\n")
     f.write(f"--------------------------------------------------\n")
     
     joint_names = ["Hip", "Knee", "Ankle", "Tip"]
     
     for i, legs_pts in enumerate(all_leg_coords):
-        # Hip (Start of line)
-        hip_p = legs_pts[1]
-        f.write(f"L{i:<4} {joint_names[0]:<14} {hip_p[0]:>10.2f} {hip_p[1]:>10.2f} {hip_p[2]:>10.2f}\n")
+        # Hip
+        p = legs_pts[1]
+        f.write(f"L{i:<4} {joint_names[0]:<14} {p[0]:>10.2f} {p[1]:>10.2f} {p[2]:>10.2f}\n")
         
         # Others
         for j in range(1, 4):
             p = legs_pts[j+1]
             f.write(f"      {joint_names[j]:<14} {p[0]:>10.2f} {p[1]:>10.2f} {p[2]:>10.2f}\n")
             
-        # Tip (End of line)
-        tip_p = legs_pts[4]
-        
         f.write(f"--------------------------------------------------\n")
-        f.write(f"Stride Start (Tip): ({stride_start_x + HIP_RADIUS:.2f}, 0.00, {req_z:.2f})\n")
-        f.write(f"Stride End (Tip)  : ({stride_end_x + HIP_RADIUS:.2f}, 0.00, {req_z:.2f})\n")
-        f.write(f"Motion Direction  : Radial (Pulling Inward)\n")
-        
 print("Joint coordinates exported to one_leg_coordinates.txt")
 
 plt.show()
